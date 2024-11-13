@@ -74,7 +74,7 @@ const SidebarContent: MenuItem[] = [
         name: "Students",
         icon: "solar:users-group-rounded-bold-duotone",
         id: uniqueId(),
-        url: "/ui/students",
+        url: "/ui/student",
       },
       
     ],

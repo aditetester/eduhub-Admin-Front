@@ -1,10 +1,21 @@
-
 import { Button, Dropdown } from "flowbite-react";
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
+
 const Profile = () => {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // Clear authentication state
+    localStorage.removeItem('isAuthenticated');
+    toast.success('Logged out successfully');
+    router.push('/login');
+  };
+
   return (
     <div className="relative group/menu">
       <Dropdown
@@ -23,7 +34,6 @@ const Profile = () => {
           </span>
         )}
       >
-
         <Dropdown.Item
           as={Link}
           href="#"
@@ -49,7 +59,13 @@ const Profile = () => {
           My Task
         </Dropdown.Item>
         <div className="p-3 pt-0">
-        <Button as={Link}  size={'sm'}  href="/auth/login" className="mt-2 border border-primary text-primary bg-transparent hover:bg-lightprimary outline-none focus:outline-none">Logout</Button>
+          <Button
+            size={'sm'}
+            onClick={handleLogout}
+            className="mt-2 border border-primary text-primary bg-transparent hover:bg-lightprimary outline-none focus:outline-none w-full"
+          >
+            Logout
+          </Button>
         </div>
       </Dropdown>
     </div>

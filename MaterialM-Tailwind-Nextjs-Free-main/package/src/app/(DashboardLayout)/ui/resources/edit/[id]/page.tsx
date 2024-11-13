@@ -9,7 +9,7 @@ import subjectsApi from '@/app/api/subjectApi';
 import { resourcesApi } from '@/app/api/resourceApi';
 import toast from 'react-hot-toast';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 interface ResourceItem {
   id: string;
@@ -148,92 +148,107 @@ const EditResourcePage = ({ params }: { params: { id: string } }) => {
   };
 
   const handleBoardChange = async (boardId: string) => {
-    setSelectedBoardId(boardId);
-    setSelectedStandardId('');
-    setSelectedSubjectId('');
-    setStandards([]);
-    setSubjects([]);
-    if (boardId) {
-      await fetchStandards(boardId);
+    try {
+      console.log('Changing board to:', boardId);
+      setSelectedBoardId(boardId);
+      setSelectedStandardId('');
+      setSelectedSubjectId('');
+      setStandards([]);
+      setSubjects([]);
+      
+      if (boardId) {
+        await fetchStandards(boardId);
+      }
+    } catch (error) {
+      console.error('Error in handleBoardChange:', error);
+      toast.error('Failed to update board selection');
     }
   };
 
   const handleStandardChange = async (standardId: string) => {
-    setSelectedStandardId(standardId);
-    setSelectedSubjectId('');
-    setSubjects([]);
-    if (standardId) {
-      await fetchSubjects(standardId);
+    try {
+      console.log('Changing standard to:', standardId);
+      setSelectedStandardId(standardId);
+      setSelectedSubjectId('');
+      setSubjects([]);
+      
+      if (standardId) {
+        await fetchSubjects(standardId);
+      }
+    } catch (error) {
+      console.error('Error in handleStandardChange:', error);
+      toast.error('Failed to update standard selection');
     }
   };
 
-const fetchResourceData = async () => {
-  if (!resourceId) {
-    toast.error('Resource ID is missing');
-    router.push('/ui/resources');
-    return;
-  }
-
-  try {
-    setIsLoading(true);
-    console.log('Fetching resource:', resourceId);
-    const response = await resourcesApi.getResourceById(resourceId);
-    console.log('Resource response:', response);
-
-    if (response.success && response.data) {
-      const resourceData = response.data;
-      
-      // Update state with resource data
-      setResource({
-        id: resourceData._id,
-        title: resourceData.name || '',
-        description: resourceData.description || '',
-        videoUrl: resourceData.videoUrl || '',
-        thumbnailPreview: resourceData.thumbnailUrl || '',
-        fileUrl: resourceData.fileUrl || ''
-      });
-      
-      setType(resourceData.type || 'PDF');
-
-      // Set board and fetch related data
-      if (resourceData.boardId) {
-        setSelectedBoardId(resourceData.boardId);
-        await fetchStandards(resourceData.boardId);
-      }
-      
-      // Set standard and fetch subjects
-      if (resourceData.standardId) {
-        setSelectedStandardId(resourceData.standardId);
-        await fetchSubjects(resourceData.standardId);
-      }
-      
-      // Set subject
-      if (resourceData.subjectId) {
-        setSelectedSubjectId(resourceData.subjectId);
-      }
-    } else {
-      throw new Error(response.error || 'Failed to fetch resource');
+  const fetchResourceData = async () => {
+    if (!resourceId) {
+      toast.error('Resource ID is missing');
+      router.push('/ui/resources');
+      return;
     }
-  } catch (error) {
-    console.error('Error fetching resource:', error);
-    toast.error('Failed to fetch resource data');
-    router.push('/ui/resources');
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+    try {
+      setIsLoading(true);
+      console.log('Fetching resource:', resourceId);
+      
+      // Fetch resource data
+      const response = await resourcesApi.getResourceById(resourceId);
+      console.log('Resource response:', response);
+
+      if (response.success && response.data) {
+        const resourceData = response.data;
+        
+        // Update resource basic info
+        setResource({
+          id: resourceData._id,
+          title: resourceData.name || '',
+          description: resourceData.description || '',
+          videoUrl: resourceData.videoUrl || '',
+          thumbnailPreview: resourceData.thumbnailUrl || '',
+          fileUrl: resourceData.fileUrl || ''
+        });
+        
+        setType(resourceData.type || 'PDF');
+
+        // First fetch all boards
+        await fetchBoards();
+
+        // Then set board and fetch standards if boardId exists
+        if (resourceData.boardId) {
+          console.log('Setting board:', resourceData.boardId);
+          setSelectedBoardId(resourceData.boardId);
+          await fetchStandards(resourceData.boardId);
+        }
+        
+        // Then set standard and fetch subjects if standardId exists
+        if (resourceData.standardId) {
+          console.log('Setting standard:', resourceData.standardId);
+          setSelectedStandardId(resourceData.standardId);
+          await fetchSubjects(resourceData.standardId);
+        }
+        
+        // Finally set subject if subjectId exists
+        if (resourceData.subjectId) {
+          console.log('Setting subject:', resourceData.subjectId);
+          setSelectedSubjectId(resourceData.subjectId);
+        }
+
+        console.log('Resource data loaded successfully');
+      } else {
+        throw new Error(response.error || 'Failed to fetch resource');
+      }
+    } catch (error) {
+      console.error('Error fetching resource:', error);
+      toast.error('Failed to fetch resource data');
+      router.push('/ui/resources');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const initializePage = async () => {
-      setIsLoading(true);
-      await Promise.all([
-        fetchBoards(),
-        fetchResourceData()
-      ]);
-      setIsLoading(false);
-    };
-
-    initializePage();
+    fetchResourceData();
   }, [resourceId]);
 
   useEffect(() => {
@@ -263,22 +278,39 @@ const fetchResourceData = async () => {
 
       const formData = new FormData();
       
+      // Add basic resource information
       formData.append('name', resource.title);
       formData.append('description', resource.description);
       formData.append('type', type);
+
+      // Add board, standard, and subject IDs
       formData.append('boardId', selectedBoardId);
       formData.append('standardId', selectedStandardId);
       formData.append('subjectId', selectedSubjectId);
 
+      // Add files based on resource type
       if (type === 'PDF' && resource.pdfFile) {
         formData.append('file', resource.pdfFile);
       } else if (type === 'VIDEO' && resource.videoUrl) {
         formData.append('videoUrl', resource.videoUrl);
       }
 
+      // Add thumbnail if changed
       if (resource.thumbnailFile) {
         formData.append('thumbnail', resource.thumbnailFile);
       }
+
+      console.log('Updating resource with:', {
+        name: resource.title,
+        description: resource.description,
+        type,
+        boardId: selectedBoardId,
+        standardId: selectedStandardId,
+        subjectId: selectedSubjectId,
+        hasNewPdf: !!resource.pdfFile,
+        hasNewThumbnail: !!resource.thumbnailFile,
+        videoUrl: resource.videoUrl
+      });
 
       const response = await resourcesApi.updateResource(resourceId, formData);
 
